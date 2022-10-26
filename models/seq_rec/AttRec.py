@@ -7,7 +7,7 @@ import tensorflow as tf
 import time
 import numpy as np
 from utils.evaluation.SeqRecMetrics import *
-import numpy as np
+import os
 
 np.set_printoptions(threshold=np.inf)
 __author__ = "Shuai Zhang"
@@ -45,12 +45,12 @@ class AttRec():
         self.num_factor = num_factor
         self.num_neg = num_neg
 
-        self.user_id = tf.placeholder(dtype=tf.int32, shape=[None], name='user_id')
-        self.item_seq = tf.placeholder(dtype=tf.int32, shape=[None, L], name='item_seq')
-        self.item_id = tf.placeholder(dtype=tf.int32, shape=[None, self.num_T], name='item_id')
-        self.item_id_test = tf.placeholder(dtype=tf.int32, shape=[None, 1], name='item_id_test')
-        self.neg_item_id = tf.placeholder(dtype=tf.int32, shape=[None, self.num_T * self.num_neg], name='item_id_neg')
-        self.isTrain = tf.placeholder(tf.bool, shape=())
+        self.user_id = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None], name='user_id')
+        self.item_seq = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, L], name='item_seq')
+        self.item_id = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, self.num_T], name='item_id')
+        self.item_id_test = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, self.num_T], name='item_id_test')
+        self.neg_item_id = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, self.num_T * self.num_neg], name='item_id_neg')
+        self.isTrain = tf.compat.v1.placeholder(tf.bool, shape=())
 
         # self.y = tf.placeholder("float", [None], 'rating')
         print(np.shape(self.user_id))
@@ -61,16 +61,16 @@ class AttRec():
         # self.Q = tf.Variable(initializer([self.num_item, num_factor] ))
         # self.X = tf.Variable(initializer([self.num_item, num_factor] ))
 
-        self.P = tf.Variable(tf.truncated_normal([self.num_user, num_factor], stddev=0.001))
-        self.V = tf.Variable(tf.truncated_normal([self.num_user, num_factor * 1], stddev=0.001))
-        self.Q = tf.Variable(tf.truncated_normal([self.num_item, num_factor], stddev=0.001))
-        self.X = tf.Variable(tf.truncated_normal([self.num_item, num_factor], stddev=0.001))
-        self.A = tf.Variable(tf.truncated_normal([self.num_item, num_factor], stddev=0.001))
+        self.P = tf.Variable(tf.random.truncated_normal([self.num_user, num_factor], stddev=0.001))
+        self.V = tf.Variable(tf.random.truncated_normal([self.num_user, num_factor * 1], stddev=0.001))
+        self.Q = tf.Variable(tf.random.truncated_normal([self.num_item, num_factor], stddev=0.001))
+        self.X = tf.Variable(tf.random.truncated_normal([self.num_item, num_factor], stddev=0.001))
+        self.A = tf.Variable(tf.random.truncated_normal([self.num_item, num_factor], stddev=0.001))
 
 
-        item_latent_factor_neg = tf.nn.embedding_lookup(self.Q, self.neg_item_id)
-        self.W = tf.Variable(tf.random_normal([self.num_item, self.num_factor * (1 + 1)], stddev=0.01))
-        self.b = tf.Variable(tf.random_normal([self.num_item], stddev=0.01))
+        item_latent_factor_neg = tf.nn.embedding_lookup(params=self.Q, ids=self.neg_item_id)
+        self.W = tf.Variable(tf.random.normal([self.num_item, self.num_factor * (1 + 1)], stddev=0.01))
+        self.b = tf.Variable(tf.random.normal([self.num_item], stddev=0.01))
         # vertical conv layer
         # self.conv_v = tf.nn.conv2d(1, n_v, (L, 1))
 
@@ -94,20 +94,20 @@ class AttRec():
 
 
 
-        self.loss = tf.reduce_sum(tf.maximum(self.target_prediction - self.negative_prediction + 0.5, 0)) \
-                    + tf.losses.get_regularization_loss() + 0.001 * (
+        self.loss = tf.reduce_sum(input_tensor=tf.maximum(self.target_prediction - self.negative_prediction + 0.5, 0)) \
+                    + tf.compat.v1.losses.get_regularization_loss() + 0.001 * (
         tf.nn.l2_loss(self.P) + tf.nn.l2_loss(self.V) + tf.nn.l2_loss(self.X) + tf.nn.l2_loss(self.Q))
 
 
         norm_clip_value = 1
-        self.clip_P = tf.assign(self.P, tf.clip_by_norm(self.P, norm_clip_value, axes=[1]))
-        self.clip_Q = tf.assign(self.Q, tf.clip_by_norm(self.Q, norm_clip_value, axes=[1]))
-        self.clip_V = tf.assign(self.V, tf.clip_by_norm(self.V, norm_clip_value, axes=[1]))
-        self.clip_X = tf.assign(self.X, tf.clip_by_norm(self.X, norm_clip_value, axes=[1]))
+        self.clip_P = tf.compat.v1.assign(self.P, tf.clip_by_norm(self.P, norm_clip_value, axes=[1]))
+        self.clip_Q = tf.compat.v1.assign(self.Q, tf.clip_by_norm(self.Q, norm_clip_value, axes=[1]))
+        self.clip_V = tf.compat.v1.assign(self.V, tf.clip_by_norm(self.V, norm_clip_value, axes=[1]))
+        self.clip_X = tf.compat.v1.assign(self.X, tf.clip_by_norm(self.X, norm_clip_value, axes=[1]))
 
 
 
-        self.optimizer = tf.train.AdagradOptimizer(self.learning_rate, initial_accumulator_value=0.05).minimize(self.loss)  # GradientDescentOptimizer
+        self.optimizer = tf.compat.v1.train.AdagradOptimizer(self.learning_rate, initial_accumulator_value=0.05).minimize(self.loss)  # GradientDescentOptimizer
 
         return self
 
@@ -123,8 +123,8 @@ class AttRec():
         return np.squeeze(params[0]), np.squeeze(params[1]), params[2]
 
     def _getItemParam(self, item_id):
-        w_items = tf.nn.embedding_lookup(self.X, item_id)
-        w_items_2 = tf.nn.embedding_lookup(self.Q, item_id)
+        w_items = tf.nn.embedding_lookup(params=self.X, ids=item_id)
+        w_items_2 = tf.nn.embedding_lookup(params=self.Q, ids=item_id)
         return w_items, w_items_2
 
 
@@ -139,58 +139,58 @@ class AttRec():
 
         # item_latent_factor = self.add_timing_signal(item_latent_factor)
 
-        item_latent_factor =  tf.nn.embedding_lookup(self.Q, item_seq) #+ self.user_specific_bias
+        item_latent_factor =  tf.nn.embedding_lookup(params=self.Q, ids=item_seq) #+ self.user_specific_bias
 
 
-        item_latent_factor_2 = tf.nn.embedding_lookup(self.X, item_seq)
+        item_latent_factor_2 = tf.nn.embedding_lookup(params=self.X, ids=item_seq)
 
         query = key = value = self.add_timing_signal(item_latent_factor)
 
         if isTrain:
-            query = tf.layers.dense(inputs=query, name="linear_project", units=self.num_factor, activation=tf.nn.relu,
+            query = tf.compat.v1.layers.dense(inputs=query, name="linear_project", units=self.num_factor, activation=tf.nn.relu,
                                     use_bias=False,
-                                    kernel_initializer=tf.contrib.layers.xavier_initializer(), reuse=tf.AUTO_REUSE,
-                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate)
+                                    kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"), reuse=tf.compat.v1.AUTO_REUSE,
+                                    kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate))
                                     )
             #query = tf.layers.dropout(query, rate=0.0)
-            key = tf.layers.dense(inputs=key, name="linear_project", units=self.num_factor, activation=tf.nn.relu,
+            key = tf.compat.v1.layers.dense(inputs=key, name="linear_project", units=self.num_factor, activation=tf.nn.relu,
                                   use_bias=False,
-                                  kernel_initializer=tf.contrib.layers.xavier_initializer(), reuse=tf.AUTO_REUSE,
-                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate),
+                                  kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"), reuse=tf.compat.v1.AUTO_REUSE,
+                                  kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate)),
                                   )
             #key = tf.layers.dropout(key, rate=0.3)
         else:
-            query = tf.layers.dense(inputs=query, name="linear_project", units=self.num_factor, activation=tf.nn.relu,
+            query = tf.compat.v1.layers.dense(inputs=query, name="linear_project", units=self.num_factor, activation=tf.nn.relu,
                                     use_bias=False,
-                                    kernel_initializer=tf.contrib.layers.xavier_initializer(), reuse=tf.AUTO_REUSE,
-                                    kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate)
+                                    kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"), reuse=tf.compat.v1.AUTO_REUSE,
+                                    kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate))
                                     )
-            key = tf.layers.dense(inputs=key, name="linear_project", units=self.num_factor, activation=tf.nn.relu,
+            key = tf.compat.v1.layers.dense(inputs=key, name="linear_project", units=self.num_factor, activation=tf.nn.relu,
                                   use_bias=False,
-                                  kernel_initializer=tf.contrib.layers.xavier_initializer(), reuse=tf.AUTO_REUSE,
-                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate)
+                                  kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"), reuse=tf.compat.v1.AUTO_REUSE,
+                                  kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate))
                                   )
 
         logits = tf.matmul(query, key, transpose_b=True) / np.sqrt(self.num_factor)
 
         print(np.shape(logits))
-        weights = tf.nn.softmax(logits, dim=-1, name="attention_weights")
+        weights = tf.nn.softmax(logits, axis=-1, name="attention_weights")
         mask = tf.ones([self.L, self.L])
-        mask = tf.matrix_set_diag(mask, tf.zeros([self.L]))
+        mask = tf.linalg.set_diag(mask, tf.zeros([self.L]))
         weights = weights * mask
 
         out =   tf.matmul(weights, item_latent_factor )
         self.weights = weights
 
         print(np.shape(item_latent_factor))
-        self.out = tf.reduce_mean(out, 1)
+        self.out = tf.reduce_mean(input_tensor=out, axis=1)
         print(np.shape(self.out))
 
 
-        w_items =  tf.nn.embedding_lookup(self.X, item_id)
-        w_items_2 = tf.nn.embedding_lookup(self.Q, item_id)
-        w_items_3 = tf.nn.embedding_lookup(self.V, user_id)#tf.nn.embedding_lookup(self.A, item_id)
-        self.bias_item = tf.nn.embedding_lookup(self.b, item_id)
+        w_items =  tf.nn.embedding_lookup(params=self.X, ids=item_id)
+        w_items_2 = tf.nn.embedding_lookup(params=self.Q, ids=item_id)
+        w_items_3 = tf.nn.embedding_lookup(params=self.V, ids=user_id)#tf.nn.embedding_lookup(self.A, item_id)
+        self.bias_item = tf.nn.embedding_lookup(params=self.b, ids=item_id)
 
 
         x_tmp = []
@@ -199,10 +199,10 @@ class AttRec():
         x = tf.stack(x_tmp)
         print(np.shape(x))
         print(np.shape(w_items))
-        x = tf.transpose(x, [1, 0, 2])
+        x = tf.transpose(a=x, perm=[1, 0, 2])
 
 
-        self.user_latent_factor = tf.nn.embedding_lookup(self.P, user_id)
+        self.user_latent_factor = tf.nn.embedding_lookup(params=self.P, ids=user_id)
 
 
         u_tmp = []
@@ -210,23 +210,23 @@ class AttRec():
             u_tmp.append(self.user_latent_factor)
         u = tf.stack(u_tmp)
         print(np.shape(u))
-        u = tf.transpose(u, [1, 0, 2])
+        u = tf.transpose(a=u, perm=[1, 0, 2])
 
-        self.user_specific_bias = tf.nn.embedding_lookup(self.V, user_id)
+        self.user_specific_bias = tf.nn.embedding_lookup(params=self.V, ids=user_id)
         u_tmp_2 = []
         for i in range(np.shape(item_id)[1]):
             u_tmp_2.append(self.user_specific_bias)
         u_2 = tf.stack(u_tmp_2)
         print(np.shape(u_2))
-        u_2 = tf.transpose(u_2, [1, 0, 2])
+        u_2 = tf.transpose(a=u_2, perm=[1, 0, 2])
 
 
         self.alpha = 0.2
         if isTrain:
-            res = self.alpha * tf.reduce_sum(tf.nn.dropout(tf.square(w_items - u), 1), 2) + (1-self.alpha) * tf.reduce_sum(tf.nn.dropout(tf.square(x -w_items_2  ),1),2)   #+ 0.1 * tf.reduce_sum(tf.square(x - u), 2)
+            res = self.alpha * tf.reduce_sum(input_tensor=tf.nn.dropout(tf.square(w_items - u), rate=1 - (1)), axis=2) + (1-self.alpha) * tf.reduce_sum(input_tensor=tf.nn.dropout(tf.square(x -w_items_2  ),rate=1 - (1)),axis=2)   #+ 0.1 * tf.reduce_sum(tf.square(x - u), 2)
         else:
-            res = self.alpha * tf.reduce_sum(tf.square(w_items - u), 2) + (1 - self.alpha) * tf.reduce_sum(
-                tf.square(x - w_items_2 ), 2)
+            res = self.alpha * tf.reduce_sum(input_tensor=tf.square(w_items - u), axis=2) + (1 - self.alpha) * tf.reduce_sum(
+                input_tensor=tf.square(x - w_items_2 ), axis=2)
 
         print(np.shape(res))
         return tf.squeeze(res)
@@ -239,33 +239,33 @@ class AttRec():
         out, out_h, out_v = None, None, None
 
         # item_latent_factor = self.add_timing_signal(item_latent_factor)
-        item_latent_factor = tf.nn.embedding_lookup(self.Q, item_seq)
-        item_latent_factor_2 = tf.nn.embedding_lookup(self.X, item_seq)
+        item_latent_factor = tf.nn.embedding_lookup(params=self.Q, ids=item_seq)
+        item_latent_factor_2 = tf.nn.embedding_lookup(params=self.X, ids=item_seq)
 
         query = key = self.add_timing_signal(item_latent_factor)
 
-        out = self.multihead_attention(queries=query, keys=key, value=item_latent_factor, reuse=tf.AUTO_REUSE)
-        out = tf.reduce_mean(out, 1)
+        out = self.multihead_attention(queries=query, keys=key, value=item_latent_factor, reuse=tf.compat.v1.AUTO_REUSE)
+        out = tf.reduce_mean(input_tensor=out, axis=1)
 
         query_2 = key_2 = out
-        query_2 = tf.layers.dense(inputs=query_2, name="linear_project1", units=self.num_factor, activation=None,
+        query_2 = tf.compat.v1.layers.dense(inputs=query_2, name="linear_project1", units=self.num_factor, activation=None,
                                   use_bias=False,
-                                  kernel_initializer=tf.contrib.layers.xavier_initializer(), reuse=tf.AUTO_REUSE,
-                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate)
+                                  kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"), reuse=tf.compat.v1.AUTO_REUSE,
+                                  kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate))
                                   )
-        key_2 = tf.layers.dense(inputs=key_2, name="linear_project1", units=self.num_factor, activation=None,
+        key_2 = tf.compat.v1.layers.dense(inputs=key_2, name="linear_project1", units=self.num_factor, activation=None,
                                 use_bias=False,
-                                kernel_initializer=tf.contrib.layers.xavier_initializer(), reuse=tf.AUTO_REUSE,
-                                kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate)
+                                kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"), reuse=tf.compat.v1.AUTO_REUSE,
+                                kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate))
                                 )
         # value = tf.layers.dense(inputs= key, name="linear_project", units = seq_len_item, activation = None,  kernel_initializer=tf.random_normal_initializer, reuse=True)
         # b =  tf.Variable(tf.random_normal([seq_len_user], stddev=1))
         logits_2 = tf.matmul(query_2, key_2, transpose_b=True) / np.sqrt(self.num_factor)
         weights_2 = tf.nn.softmax(logits_2, name="attention_weights1")
         mask_2 = tf.ones([self.L, self.L])
-        mask_2 = tf.matrix_set_diag(mask_2, tf.zeros([self.L]))
+        mask_2 = tf.linalg.set_diag(mask_2, tf.zeros([self.L]))
         weights_2 = weights_2 * mask_2
-        out_2 = tf.reduce_mean(tf.matmul(weights_2, out) , 1)
+        out_2 = tf.reduce_mean(input_tensor=tf.matmul(weights_2, out) , axis=1)
 
         print("--------------")
         print(np.shape(out))
@@ -274,10 +274,10 @@ class AttRec():
 
 
 
-        w_items = tf.nn.embedding_lookup(self.X, item_id)
-        w_items_2 = tf.nn.embedding_lookup(self.Q, item_id)
-        b_items = tf.nn.embedding_lookup(self.b, item_id)
-        item_specific_bias = tf.nn.embedding_lookup(self.X, item_id)
+        w_items = tf.nn.embedding_lookup(params=self.X, ids=item_id)
+        w_items_2 = tf.nn.embedding_lookup(params=self.Q, ids=item_id)
+        b_items = tf.nn.embedding_lookup(params=self.b, ids=item_id)
+        item_specific_bias = tf.nn.embedding_lookup(params=self.X, ids=item_id)
 
 
         x_tmp = []
@@ -286,17 +286,17 @@ class AttRec():
         x = tf.stack(x_tmp)
         print(np.shape(x))
         print(np.shape(w_items))
-        x = tf.transpose(x, [1, 0, 2])
+        x = tf.transpose(a=x, perm=[1, 0, 2])
 
         u_tmp = []
         for i in range(np.shape(w_items)[1]):
             u_tmp.append(user_latent_factor)
         u = tf.stack(u_tmp)
         print(np.shape(u))
-        u = tf.transpose(u, [1, 0, 2])
+        u = tf.transpose(a=u, perm=[1, 0, 2])
 
         # res = tf.reduce_sum(tf.multiply(x, w_items), 2) + b_items
-        res = 0.2 * tf.reduce_sum(tf.square(w_items - u), 2) + 0.8 * tf.reduce_sum(tf.square(x- w_items_2),2)   # + 0.1 * tf.reduce_sum(tf.square(x - u), 2)
+        res = 0.2 * tf.reduce_sum(input_tensor=tf.square(w_items - u), axis=2) + 0.8 * tf.reduce_sum(input_tensor=tf.square(x- w_items_2),axis=2)   # + 0.1 * tf.reduce_sum(tf.square(x - u), 2)
 
 
         print(np.shape(res))
@@ -305,15 +305,15 @@ class AttRec():
     def execute(self, train_data, test_data):
 
         self.prepare_data(train_data, test_data)
-        init = tf.global_variables_initializer()
+        init = tf.compat.v1.global_variables_initializer()
         self.sess.run(init)
         for epoch in range(self.epochs):
             if self.verbose:
                 print("Epoch: %04d;" % (epoch))
             self.train(train_data)
-            if (epoch) % self.T == 0 and epoch >= 5:
-                print("Epoch: %04d; " % (epoch), end='')
-                self.test(test_data)
+        #    if (epoch) % self.T == 0 and epoch >= 5:
+        #        print("Epoch: %04d; " % (epoch), end='')
+        #        self.test(test_data)
 
 
     def prepare_data(self, train_data, test_data):
@@ -391,6 +391,74 @@ class AttRec():
                     print("Index: %04d; cost= %.9f" % (i + 1, np.mean(loss)))
                     #             print("one iteration: %s seconds." % (time.time() - start_time))
 
+    def inference(self, args, train_data, test_data):
+        print("---- inference start")
+        self.prepare_data(train_data, test_data)
+        init = tf.compat.v1.global_variables_initializer()
+        self.sess.run(init)
+
+        total_time = 0.0
+        total_sample = 0
+        self.batch_size = args.batch_size
+        run_options = tf.compat.v1.RunOptions(trace_level=tf.compat.v1.RunOptions.FULL_TRACE)
+        run_metadata = tf.compat.v1.RunMetadata()
+        for epoch in range(self.epochs):
+            print("---- {} epoch start".format(epoch))
+            self.num_training = len(self.sequences)
+            self.total_batch = int(self.num_training / self.batch_size)
+            L, T = train_data.sequences.L, train_data.sequences.T
+            self.test_sequences = train_data.test_sequences.sequences
+            idxs = np.random.permutation(
+                self.num_training)  # shuffled ordering np.random.choice(self.num_training, self.num_training, replace=True) #
+
+            sequences_random = [i.tolist() for i in list(self.sequences[idxs])]
+            targets_random = list(self.targets[idxs])
+            users_random = [i[0] for i in list(self.users[idxs])]
+            self.x_random = list(self.x[idxs])
+
+            num_iter = min(self.total_batch, args.num_iter)
+            for i in range(num_iter):
+                batch_user = users_random[i * self.batch_size:(i + 1) * self.batch_size]
+                batch_seq = sequences_random[i * self.batch_size:(i + 1) * self.batch_size]
+                batch_item = targets_random[i * self.batch_size:(i + 1) * self.batch_size]
+                start_time = time.time()
+                if args.profile:
+                    self.sess.run([self.test_prediction], 
+                        feed_dict={self.user_id: batch_user,
+                                   self.item_seq: batch_seq,
+                                   self.item_id_test: batch_item},
+                        options=run_options, run_metadata=run_metadata
+                    )
+                else:
+                    self.sess.run([self.test_prediction], 
+                        feed_dict={self.user_id: batch_user,
+                                   self.item_seq: batch_seq,
+                                   self.item_id_test: batch_item},
+                    )
+                end_time = time.time()
+                print("{} iter`s duration: {}".format(i, end_time - start_time))
+                if i > args.num_warmup:
+                    total_time += end_time - start_time
+                    total_sample += self.batch_size
+                # save profiling file
+                if args.profile and i == num_iter // 2 and epoch == self.epochs // 2:
+                    import pathlib
+                    from tensorflow.python.client import timeline
+                    trace = timeline.Timeline(step_stats=run_metadata.step_stats)
+                    model_dir = str(pathlib.Path.cwd()) + '/timeline'
+                    if not os.path.exists(model_dir):
+                        try:
+                            os.makedirs(model_dir)
+                        except:
+                            pass
+                    profiling_file = model_dir + '/timeline-' + str(os.getpid()) + '.json'
+                    with open(profiling_file, 'w') as trace_file:
+                        trace_file.write(trace.generate_chrome_trace_format(show_memory=False))
+        latency = total_time / total_sample * 1000
+        throughput = total_sample / total_time
+        print("### Latency:: {:.4f} ms".format(latency))
+        print("### Throughput: {:.3f} samples/s".format(throughput))
+
     def test(self, test_data):
         # print(test_data.user_map)
 
@@ -402,7 +470,7 @@ class AttRec():
         evaluate1(self)
 
     def save(self, path):
-        saver = tf.train.Saver()
+        saver = tf.compat.v1.train.Saver()
         saver.save(self.sess, path)
 
     def predict(self, user_id, item_id):
@@ -418,7 +486,7 @@ class AttRec():
                                                                   self.item_id_test: item_id})[0]
 
     def _weight_variable(self, shape):
-        initial = tf.random_normal(shape, stddev=0.1)
+        initial = tf.random.normal(shape, stddev=0.1)
         return tf.Variable(initial)
 
     def _bias_variable(self, shape):
@@ -487,24 +555,24 @@ class AttRec():
         Returns:
             a Tensor the same shape as x.
         """
-        with tf.name_scope("add_timing_signal", values=[x]):
-            length = tf.shape(x)[1]
-            channels = tf.shape(x)[2]
-            position = tf.to_float(tf.range(length))
+        with tf.compat.v1.name_scope("add_timing_signal", values=[x]):
+            length = tf.shape(input=x)[1]
+            channels = tf.shape(input=x)[2]
+            position = tf.cast(tf.range(length), dtype=tf.float32)
             num_timescales = channels // 2
 
             log_timescale_increment = (
                 math.log(float(max_timescale) / float(min_timescale)) /
-                (tf.to_float(num_timescales) - 1)
+                (tf.cast(num_timescales, dtype=tf.float32) - 1)
             )
             inv_timescales = min_timescale * tf.exp(
-                tf.to_float(tf.range(num_timescales)) * -log_timescale_increment
+                tf.cast(tf.range(num_timescales), dtype=tf.float32) * -log_timescale_increment
             )
 
             scaled_time = (tf.expand_dims(position, 1) *
                            tf.expand_dims(inv_timescales, 0))
             signal = tf.concat([tf.sin(scaled_time), tf.cos(scaled_time)], axis=1)
-            signal = tf.pad(signal, [[0, 0], [0, tf.mod(channels, 2)]])
+            signal = tf.pad(tensor=signal, paddings=[[0, 0], [0, tf.math.floormod(channels, 2)]])
             signal = tf.reshape(signal, [1, length, channels])
 
             return x + signal
@@ -524,11 +592,11 @@ class AttRec():
         Returns:
           A tensor with the same shape and data dtype as `inputs`.
         '''
-        with tf.variable_scope(scope, reuse=reuse):
+        with tf.compat.v1.variable_scope(scope, reuse=reuse):
             inputs_shape = inputs.get_shape()
             params_shape = inputs_shape[-1:]
 
-            mean, variance = tf.nn.moments(inputs, [-1], keep_dims=True)
+            mean, variance = tf.nn.moments(x=inputs, axes=[-1], keepdims=True)
             beta = tf.Variable(tf.zeros(params_shape))
             gamma = tf.Variable(tf.ones(params_shape))
             normalized = (inputs - mean) / ((variance + epsilon) ** (.5))
@@ -537,60 +605,60 @@ class AttRec():
         return outputs
 
     def multihead_attention(self, queries, keys, value, num_units=None, num_heads=2, dropout_rate=0, is_training=True, causality=False, scope="multihead_attention", reuse=None):
-        with tf.variable_scope(scope, reuse=reuse):
+        with tf.compat.v1.variable_scope(scope, reuse=reuse):
             if num_units is None:
                 num_units = queries.get_shape().as_list()[-1]
 
 
-            Q = tf.layers.dense(queries, num_units, name="project_q", activation=tf.nn.relu,
+            Q = tf.compat.v1.layers.dense(queries, num_units, name="project_q", activation=tf.nn.relu,
                                 use_bias=False,
-                                kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate)) # (batch size, sequence length, dim)
-            K = tf.layers.dense(keys, num_units, name="project_k", activation=tf.nn.relu,
+                                kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"),
+                                kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate))) # (batch size, sequence length, dim)
+            K = tf.compat.v1.layers.dense(keys, num_units, name="project_k", activation=tf.nn.relu,
                                 use_bias=False,
-                                kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate))
-            V = tf.layers.dense(value, num_units, name="project_v",activation=tf.nn.relu,
+                                kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"),
+                                kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate)))
+            V = tf.compat.v1.layers.dense(value, num_units, name="project_v",activation=tf.nn.relu,
                                 use_bias=False,
-                                kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate))
+                                kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"),
+                                kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate)))
 
             Q_ = tf.concat(tf.split(Q, num_heads, axis=2),axis=0) #( h * batch size, seq len, dim/h)
             K_ = tf.concat(tf.split(K, num_heads, axis=2),axis=0)
             V_ = tf.concat(tf.split(value, num_heads, axis=2),axis=0)
 
 
-            outputs = tf.matmul(Q_, tf.transpose(K_, [0, 2, 1]))
+            outputs = tf.matmul(Q_, tf.transpose(a=K_, perm=[0, 2, 1]))
 
             # scale
             outputs = outputs / ( K_.get_shape().as_list()[-1] ** 0.5)
 
             # key masking
-            key_masks = tf.sign(tf.abs(tf.reduce_sum(keys, axis=-1))) # (batch size, seq len)
+            key_masks = tf.sign(tf.abs(tf.reduce_sum(input_tensor=keys, axis=-1))) # (batch size, seq len)
             key_masks = tf.tile(key_masks, [num_heads, 1])
-            key_masks = tf.tile(tf.expand_dims(key_masks, 1), [ 1, tf.shape(queries)[1], 1])
+            key_masks = tf.tile(tf.expand_dims(key_masks, 1), [ 1, tf.shape(input=queries)[1], 1])
 
             paddings = tf.ones_like(outputs) * (-2**32 + 1)
 
-            outputs = tf.where(tf.equal(key_masks, 0), paddings, outputs)
+            outputs = tf.compat.v1.where(tf.equal(key_masks, 0), paddings, outputs)
 
 
             if causality:
                 diag_vals = tf.ones_like(outputs[0,:,:])
                 tril = tf.contrib.linalg.LinearOperatorTriL(diag_vals).to_dense()
-                masks = tf.tile(tf.expand_dims(tril, 0), [tf.shape(outputs)[0], 1, 1])
+                masks = tf.tile(tf.expand_dims(tril, 0), [tf.shape(input=outputs)[0], 1, 1])
 
                 paddings = tf.ones_like(masks) * ( -2**32 +1 )
-                outputs = tf.where(tf.equal(key_masks, 0), paddings, outputs)
+                outputs = tf.compat.v1.where(tf.equal(key_masks, 0), paddings, outputs)
 
             outputs = tf.nn.sigmoid(outputs)
 
-            query_masks = tf.sign(tf.abs(tf.reduce_sum(queries, axis=-1)))
+            query_masks = tf.sign(tf.abs(tf.reduce_sum(input_tensor=queries, axis=-1)))
             query_masks = tf.tile(query_masks, [num_heads, 1])
-            query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1,1, tf.shape(keys)[1]])
+            query_masks = tf.tile(tf.expand_dims(query_masks, -1), [1,1, tf.shape(input=keys)[1]])
             outputs *= query_masks
 
-            outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(is_training))
+            outputs = tf.compat.v1.layers.dropout(outputs, rate=dropout_rate, training=tf.convert_to_tensor(value=is_training))
 
             outputs = tf.matmul(outputs, V_)
 
@@ -618,25 +686,25 @@ class AttRec():
         Returns:
           A 3d tensor with the same shape and dtype as inputs
         '''
-        with tf.variable_scope(scope, reuse=reuse):
+        with tf.compat.v1.variable_scope(scope, reuse=reuse):
             # Inner layer
             params = {"inputs": inputs, "filters": num_units[0], "kernel_size": 1,
                       "activation": tf.nn.relu, "use_bias": True}
-            outputs = tf.layers.conv1d(**params,
-                                       kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate))
+            outputs = tf.compat.v1.layers.conv1d(**params,
+                                       kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"),
+                                kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate)))
 
             # Readout layer
             params = {"inputs": outputs, "filters": num_units[1], "kernel_size": 1,
                       "activation": None, "use_bias": True}
-            outputs = tf.layers.conv1d(**params, kernel_initializer=tf.contrib.layers.xavier_initializer(),
-                                kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate))
+            outputs = tf.compat.v1.layers.conv1d(**params, kernel_initializer=tf.compat.v1.keras.initializers.VarianceScaling(scale=1.0, mode="fan_avg", distribution="uniform"),
+                                kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate)))
 
             # Residual connection
             outputs += inputs
 
             # Normalize
-            outputs = self.normalize(outputs, reuse=tf.AUTO_REUSE)
+            outputs = self.normalize(outputs, reuse=tf.compat.v1.AUTO_REUSE)
 
         return outputs
 
@@ -665,24 +733,24 @@ class AttRec():
         """
         static_shape = x.get_shape().as_list()
         num_dims = len(static_shape) - 2
-        channels = tf.shape(x)[-1]
+        channels = tf.shape(input=x)[-1]
         num_timescales = channels // (num_dims * 2)
         log_timescale_increment = (
             math.log(float(max_timescale) / float(min_timescale)) /
-            (tf.to_float(num_timescales) - 1)
+            (tf.cast(num_timescales, dtype=tf.float32) - 1)
         )
         inv_timescales = min_timescale * tf.exp(
-              tf.to_float(tf.range(num_timescales)) * -log_timescale_increment
+              tf.cast(tf.range(num_timescales), dtype=tf.float32) * -log_timescale_increment
         )
         for dim in range(num_dims):
-            length = tf.shape(x)[dim + 1]
-            position = tf.to_float(tf.range(length))
+            length = tf.shape(input=x)[dim + 1]
+            position = tf.cast(tf.range(length), dtype=tf.float32)
             scaled_time = tf.expand_dims(position, 1) * tf.expand_dims(
                 inv_timescales, 0)
             signal = tf.concat([tf.sin(scaled_time), tf.cos(scaled_time)], axis=1)
             prepad = dim * 2 * num_timescales
             postpad = channels - (dim + 1) * 2 * num_timescales
-            signal = tf.pad(signal, [[0, 0], [prepad, postpad]])
+            signal = tf.pad(tensor=signal, paddings=[[0, 0], [prepad, postpad]])
             for _ in range(1 + dim):
                 signal = tf.expand_dims(signal, 0)
             for _ in range(num_dims - 1 - dim):

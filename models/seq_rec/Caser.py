@@ -7,6 +7,7 @@ import tensorflow as tf
 import time
 import numpy as np
 from utils.evaluation.SeqRecMetrics import *
+import os
 
 __author__ = "Shuai Zhang"
 __copyright__ = "Copyright 2018, The DeepRec Project"
@@ -44,26 +45,26 @@ class Caser():
         self.num_factor = num_factor
         self.num_neg = num_neg
 
-        self.user_id = tf.placeholder(dtype=tf.int32, shape=[None], name='user_id')
-        self.item_seq = tf.placeholder(dtype=tf.int32, shape=[None, L], name='item_seq')
-        self.item_id = tf.placeholder(dtype=tf.int32, shape=[None,  self.num_T], name='item_id')
-        self.item_id_test = tf.placeholder(dtype=tf.int32, shape=[None, 1], name='item_id_test')
-        self.neg_item_id = tf.placeholder(dtype=tf.int32, shape=[None, self.num_T * self.num_neg], name='item_id_neg')
-        self.isTrain = tf.placeholder(tf.bool, shape=())
+        self.user_id = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None], name='user_id')
+        self.item_seq = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, L], name='item_seq')
+        self.item_id = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None,  self.num_T], name='item_id')
+        self.item_id_test = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, self.num_T], name='item_id_test')
+        self.neg_item_id = tf.compat.v1.placeholder(dtype=tf.int32, shape=[None, self.num_T * self.num_neg], name='item_id_neg')
+        self.isTrain = tf.compat.v1.placeholder(tf.bool, shape=())
 
         # self.y = tf.placeholder("float", [None], 'rating')
         print(np.shape(self.user_id))
 
-        self.P = tf.Variable(tf.random_normal([self.num_user, num_factor], stddev=0.01))
-        self.V = tf.Variable(tf.random_normal([self.num_user, num_factor * self.L], stddev=0.01))
-        self.Q = tf.Variable(tf.random_normal([self.num_item, num_factor], stddev=0.01))
+        self.P = tf.Variable(tf.random.normal([self.num_user, num_factor], stddev=0.01))
+        self.V = tf.Variable(tf.random.normal([self.num_user, num_factor * self.L], stddev=0.01))
+        self.Q = tf.Variable(tf.random.normal([self.num_item, num_factor], stddev=0.01))
 
-        user_latent_factor = tf.nn.embedding_lookup(self.P, self.user_id)
-        self.user_specific_bias =  tf.nn.embedding_lookup(self.V, self.user_id)
-        item_latent_factor = tf.nn.embedding_lookup(self.Q, self.item_seq)
-        item_latent_factor_neg = tf.nn.embedding_lookup(self.Q, self.neg_item_id)
-        self.W = tf.Variable(tf.random_normal([self.num_item, self.num_factor * 2 ], stddev=0.01))
-        self.b = tf.Variable(tf.random_normal([self.num_item], stddev=0.01))
+        user_latent_factor = tf.nn.embedding_lookup(params=self.P, ids=self.user_id)
+        self.user_specific_bias =  tf.nn.embedding_lookup(params=self.V, ids=self.user_id)
+        item_latent_factor = tf.nn.embedding_lookup(params=self.Q, ids=self.item_seq)
+        item_latent_factor_neg = tf.nn.embedding_lookup(params=self.Q, ids=self.neg_item_id)
+        self.W = tf.Variable(tf.random.normal([self.num_item, self.num_factor * 2 ], stddev=0.01))
+        self.b = tf.Variable(tf.random.normal([self.num_item], stddev=0.01))
         # vertical conv layer
         # self.conv_v = tf.nn.conv2d(1, n_v, (L, 1))
 
@@ -76,13 +77,13 @@ class Caser():
 
 
 
-        self.loss = - tf.reduce_mean(tf.log(tf.sigmoid(self.target_prediction) + 1e-10)) - tf.reduce_mean(
-            tf.log(1 - tf.sigmoid(self.negative_prediction) + 1e-10)) + self.reg_rate * (
+        self.loss = - tf.reduce_mean(input_tensor=tf.math.log(tf.sigmoid(self.target_prediction) + 1e-10)) - tf.reduce_mean(
+            input_tensor=tf.math.log(1 - tf.sigmoid(self.negative_prediction) + 1e-10)) + self.reg_rate * (
             tf.nn.l2_loss(self.P) + tf.nn.l2_loss(self.Q) + tf.nn.l2_loss(self.V)+ tf.nn.l2_loss(self.W) + tf.nn.l2_loss(
-                self.b)) + tf.losses.get_regularization_loss()
+                self.b)) + tf.compat.v1.losses.get_regularization_loss()
 
 
-        self.optimizer = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
+        self.optimizer = tf.compat.v1.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
 
         return self
 
@@ -115,15 +116,15 @@ class Caser():
             #                                 filter=self._weight_variable(shape=[self.L, 1, 1, self.n_v]),
             #                                 strides=[1,1,1,1],
             #                                 padding='SAME'), 2)
-            out_v = tf.squeeze(tf.layers.conv2d(inputs=tf.expand_dims(item_latent_factor, 3),
+            out_v = tf.squeeze(tf.compat.v1.layers.conv2d(inputs=tf.expand_dims(item_latent_factor, 3),
                                                 filters=self.n_v,
                                                 kernel_size=(self.L, 1),
                                                 padding='valid',
-                                                kernel_initializer=tf.random_normal_initializer,
-                                                kernel_regularizer=tf.contrib.layers.l2_regularizer(
-                                                    scale=self.reg_rate),
+                                                kernel_initializer=tf.compat.v1.random_normal_initializer,
+                                                kernel_regularizer=tf.keras.regularizers.l2(
+                                                    l=0.5 * (self.reg_rate)),
                                                 data_format='channels_last',
-                                                reuse=tf.AUTO_REUSE,
+                                                reuse=tf.compat.v1.AUTO_REUSE,
                                                 name="Convv"), 1)
             print(";;;;;;;;;;;;;;;;")
 
@@ -132,22 +133,22 @@ class Caser():
         out_hs = list()
         if self.n_h:
             for i in lengths:
-                conv_out = tf.nn.relu(tf.squeeze(tf.layers.conv2d(inputs=tf.expand_dims(item_latent_factor, 3),
+                conv_out = tf.nn.relu(tf.squeeze(tf.compat.v1.layers.conv2d(inputs=tf.expand_dims(item_latent_factor, 3),
                                                                   filters=self.n_h,
                                                                   kernel_size=(i, self.num_factor),
                                                                   padding='valid',
-                                                                  kernel_initializer=tf.random_normal_initializer,
-                                                                  kernel_regularizer=tf.contrib.layers.l2_regularizer(
-                                                                      scale=self.reg_rate),
+                                                                  kernel_initializer=tf.compat.v1.random_normal_initializer,
+                                                                  kernel_regularizer=tf.keras.regularizers.l2(
+                                                                      l=0.5 * (self.reg_rate)),
                                                                   data_format='channels_last',
-                                                                  reuse=tf.AUTO_REUSE,
+                                                                  reuse=tf.compat.v1.AUTO_REUSE,
                                                                   name="Convh" + str(i)), 2))
                 # print(np.shape(conv_out))
                 # print(np.shape(conv_out)[1])
                 # print(tf.shape(conv_out))
                 # conv_out = tf.transpose(conv_out, [0,2,1])
                 pool_out = tf.squeeze(
-                    tf.layers.max_pooling1d(conv_out, [np.shape(conv_out)[1]], data_format='channels_last',
+                    tf.compat.v1.layers.max_pooling1d(conv_out, [np.shape(conv_out)[1]], data_format='channels_last',
                                             padding='valid', strides=1), 1)
                 print(np.shape(pool_out))  # (?, 16)
                 out_hs.append(pool_out)
@@ -162,14 +163,14 @@ class Caser():
         # w and b are item specific
 
 
-        self.w_items = tf.nn.embedding_lookup(self.W, item_id)
-        self.b_items = tf.nn.embedding_lookup(self.b, item_id)
+        self.w_items = tf.nn.embedding_lookup(params=self.W, ids=item_id)
+        self.b_items = tf.nn.embedding_lookup(params=self.b, ids=item_id)
 
-        z = tf.layers.dense(out, units=self.num_factor, activation=tf.nn.relu,
-                            kernel_initializer=tf.random_normal_initializer,
-                            kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=self.reg_rate),
+        z = tf.compat.v1.layers.dense(out, units=self.num_factor, activation=tf.nn.relu,
+                            kernel_initializer=tf.compat.v1.random_normal_initializer,
+                            kernel_regularizer=tf.keras.regularizers.l2(l=0.5 * (self.reg_rate)),
                             name="full",
-                            reuse=tf.AUTO_REUSE)
+                            reuse=tf.compat.v1.AUTO_REUSE)
         print(np.shape(z))
 
         # x = tf.concat(values=[z, user_latent_factor], axis=1)
@@ -187,9 +188,9 @@ class Caser():
             x_tmp.append(x)
         x = tf.stack(x_tmp)
         print(np.shape(x))
-        x = tf.transpose(x, [1, 0, 2])
+        x = tf.transpose(a=x, perm=[1, 0, 2])
 
-        res = tf.reduce_sum(tf.multiply(x, self.w_items), 2) + self.b_items
+        res = tf.reduce_sum(input_tensor=tf.multiply(x, self.w_items), axis=2) + self.b_items
         print("......")
         print(np.shape(res))
 
@@ -215,7 +216,7 @@ class Caser():
             for user, row in enumerate(train):
                 self.neg_items[user] = list(all_items - set(row.indices))
 
-        init = tf.global_variables_initializer()
+        init = tf.compat.v1.global_variables_initializer()
         self.sess.run(init)
         for epoch in range(self.epochs):
             if self.verbose:
@@ -261,6 +262,91 @@ class Caser():
                     print("Index: %04d; cost= %.9f" % (i + 1, np.mean(loss)))
                     #             print("one iteration: %s seconds." % (time.time() - start_time))
 
+    def inference(self, args, train_data, test_data):
+        print("---- inference start")
+        self.sequences = train_data.sequences.sequences
+        self.targets = train_data.sequences.targets
+        self.users = train_data.sequences.user_ids.reshape(-1, 1)
+
+        all_items = set(np.arange(self.num_item - 1) + 1)
+        self.x = []
+        for i, u in enumerate(self.users.squeeze()):
+            tar = set([int(t) for t in self.targets[i]])
+            seq = set([int(t) for t in self.sequences[i]])
+            self.x.append(list(all_items - tar))
+        self.x = np.array(self.x)
+        if not self.neg_items:
+            all_items = set(np.arange(self.num_item - 1) + 1)
+
+            train = train_data.tocsr()
+
+            for user, row in enumerate(train):
+                self.neg_items[user] = list(all_items - set(row.indices))
+        init = tf.compat.v1.global_variables_initializer()
+        self.sess.run(init)
+
+        total_time = 0.0
+        total_sample = 0
+        self.batch_size = args.batch_size
+        run_options = tf.compat.v1.RunOptions(trace_level=tf.compat.v1.RunOptions.FULL_TRACE)
+        run_metadata = tf.compat.v1.RunMetadata()
+        for epoch in range(self.epochs):
+            print("---- {} epoch start".format(epoch))
+            self.num_training = len(self.sequences)
+            self.total_batch = int(self.num_training / self.batch_size)
+            L, T = train_data.sequences.L, train_data.sequences.T
+            self.test_sequences = train_data.test_sequences.sequences
+            idxs = np.random.permutation(
+                self.num_training)  # shuffled ordering np.random.choice(self.num_training, self.num_training, replace=True) #
+
+            sequences_random = [i.tolist() for i in list(self.sequences[idxs])]
+            targets_random = list(self.targets[idxs])
+            users_random = [i[0] for i in list(self.users[idxs])]
+            self.x_random = list(self.x[idxs])
+
+            num_iter = min(self.total_batch, args.num_iter)
+            for i in range(num_iter):
+                batch_user = users_random[i * self.batch_size:(i + 1) * self.batch_size]
+                batch_seq = sequences_random[i * self.batch_size:(i + 1) * self.batch_size]
+                batch_item = targets_random[i * self.batch_size:(i + 1) * self.batch_size]
+                start_time = time.time()
+                if args.profile:
+                    self.sess.run([self.test_prediction],
+                        feed_dict={self.user_id: batch_user,
+                                   self.item_seq: batch_seq,
+                                   self.item_id_test: batch_item},
+                        options=run_options, run_metadata=run_metadata
+                    )
+                else:
+                    self.sess.run([self.test_prediction],
+                        feed_dict={self.user_id: batch_user,
+                                   self.item_seq: batch_seq,
+                                   self.item_id_test: batch_item},
+                    )
+                end_time = time.time()
+                print("{} iter`s duration: {}".format(i, end_time - start_time))
+                if i > args.num_warmup:
+                    total_time += end_time - start_time
+                    total_sample += self.batch_size
+                # save profiling file
+                if args.profile and i == num_iter // 2 and epoch == self.epochs // 2:
+                    import pathlib
+                    from tensorflow.python.client import timeline
+                    trace = timeline.Timeline(step_stats=run_metadata.step_stats)
+                    model_dir = str(pathlib.Path.cwd()) + '/timeline'
+                    if not os.path.exists(model_dir):
+                        try:
+                            os.makedirs(model_dir)
+                        except:
+                            pass
+                    profiling_file = model_dir + '/timeline-' + str(os.getpid()) + '.json'
+                    with open(profiling_file, 'w') as trace_file:
+                        trace_file.write(trace.generate_chrome_trace_format(show_memory=False))
+        latency = total_time / total_sample * 1000
+        throughput = total_sample / total_time
+        print("### Latency:: {:.4f} ms".format(latency))
+        print("### Throughput: {:.3f} samples/s".format(throughput))
+
     def test(self, test_data):
         # print(test_data.user_map)
         self.test_data = dict()
@@ -277,7 +363,7 @@ class Caser():
         evaluate_caser(self)
 
     def save(self, path):
-        saver = tf.train.Saver()
+        saver = tf.compat.v1.train.Saver()
         saver.save(self.sess, path)
 
     def predict(self, user_id, item_id):
@@ -292,7 +378,7 @@ class Caser():
                                                                 self.item_id_test: item_id})[0]
 
     def _weight_variable(self, shape):
-        initial = tf.random_normal(shape, stddev=0.1)
+        initial = tf.random.normal(shape, stddev=0.1)
         return tf.Variable(initial)
 
     def _bias_variable(self, shape):
