@@ -422,38 +422,45 @@ class AttRec():
                 batch_seq = sequences_random[i * self.batch_size:(i + 1) * self.batch_size]
                 batch_item = targets_random[i * self.batch_size:(i + 1) * self.batch_size]
                 start_time = time.time()
-                if args.profile:
-                    self.sess.run([self.test_prediction], 
-                        feed_dict={self.user_id: batch_user,
-                                   self.item_seq: batch_seq,
-                                   self.item_id_test: batch_item},
-                        options=run_options, run_metadata=run_metadata
-                    )
-                else:
-                    self.sess.run([self.test_prediction], 
-                        feed_dict={self.user_id: batch_user,
-                                   self.item_seq: batch_seq,
-                                   self.item_id_test: batch_item},
-                    )
+                # if args.profile:
+                #     self.sess.run([self.test_prediction], 
+                #         feed_dict={self.user_id: batch_user,
+                #                    self.item_seq: batch_seq,
+                #                    self.item_id_test: batch_item},
+                #         options=run_options, run_metadata=run_metadata
+                #     )
+                # else:
+                if args.profile and epoch == self.epochs - 1 and i == num_iter - 1:
+                    print("---- collect tensorboard")
+                    options = tf.profiler.experimental.ProfilerOptions(host_tracer_level = 3, python_tracer_level = 1, device_tracer_level = 1)
+                    tf.profiler.experimental.start('./tensorboard_data', options = options)
+                self.sess.run([self.test_prediction], 
+                    feed_dict={self.user_id: batch_user,
+                                self.item_seq: batch_seq,
+                                self.item_id_test: batch_item},
+                )
+                if args.profile and epoch == self.epochs - 1 and i == num_iter - 1:
+                    tf.profiler.experimental.stop()
+                    print("---- collect tensorboard end")
                 end_time = time.time()
                 print("{} iter`s duration: {}".format(i, end_time - start_time))
                 if i > args.num_warmup:
                     total_time += end_time - start_time
                     total_sample += self.batch_size
                 # save profiling file
-                if args.profile and i == num_iter // 2 and epoch == self.epochs // 2:
-                    import pathlib
-                    from tensorflow.python.client import timeline
-                    trace = timeline.Timeline(step_stats=run_metadata.step_stats)
-                    model_dir = str(pathlib.Path.cwd()) + '/timeline'
-                    if not os.path.exists(model_dir):
-                        try:
-                            os.makedirs(model_dir)
-                        except:
-                            pass
-                    profiling_file = model_dir + '/timeline-' + str(os.getpid()) + '.json'
-                    with open(profiling_file, 'w') as trace_file:
-                        trace_file.write(trace.generate_chrome_trace_format(show_memory=False))
+                # if args.profile and i == num_iter // 2 and epoch == self.epochs // 2:
+                #     import pathlib
+                #     from tensorflow.python.client import timeline
+                #     trace = timeline.Timeline(step_stats=run_metadata.step_stats)
+                #     model_dir = str(pathlib.Path.cwd()) + '/timeline'
+                #     if not os.path.exists(model_dir):
+                #         try:
+                #             os.makedirs(model_dir)
+                #         except:
+                #             pass
+                #     profiling_file = model_dir + '/timeline-' + str(os.getpid()) + '.json'
+                #     with open(profiling_file, 'w') as trace_file:
+                #         trace_file.write(trace.generate_chrome_trace_format(show_memory=False))
         latency = total_time / total_sample * 1000
         throughput = total_sample / total_time
         print("### Latency:: {:.4f} ms".format(latency))

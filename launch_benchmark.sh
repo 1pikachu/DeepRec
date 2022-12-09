@@ -52,6 +52,7 @@ function generate_core {
         elif [ "${device}" == "cuda" ];then
             OOB_EXEC_HEADER=" CUDA_VISIBLE_DEVICES=${device_array[i]} "
         fi
+	OOB_EXEC_HEADER+=" ${OOB_EXTRA_HEADER} "
         printf " ${OOB_EXEC_HEADER} \
 	    python testSeqRec.py --model ${model_name} \
 		--precision ${precision} --batch_size $batch_size \
