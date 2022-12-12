@@ -21,6 +21,7 @@ def parse_args():
     parser.add_argument('--learning_rate', type=float, default=1e-3) #1e-4 for unlimpair
     parser.add_argument('--reg_rate', type=float, default=0.1) #0.01 for unlimpair
     parser.add_argument("--profile", action='store_true', help="profile.")
+    parser.add_argument("--tensorboard", action='store_true')
     parser.add_argument("--precision", type=str, default='float32', help="float32, int8 or float16")
     parser.add_argument("--num_iter", type=int, default=200)
     parser.add_argument("--num_warmup", type=int, default=20)

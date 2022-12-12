@@ -430,7 +430,7 @@ class AttRec():
                 #         options=run_options, run_metadata=run_metadata
                 #     )
                 # else:
-                if args.profile and epoch == self.epochs - 1 and i == num_iter - 1:
+                if args.tensorboard and epoch == self.epochs - 1 and i == num_iter - 1:
                     print("---- collect tensorboard")
                     options = tf.profiler.experimental.ProfilerOptions(host_tracer_level = 3, python_tracer_level = 1, device_tracer_level = 1)
                     tf.profiler.experimental.start('./tensorboard_data', options = options)
@@ -439,11 +439,11 @@ class AttRec():
                                 self.item_seq: batch_seq,
                                 self.item_id_test: batch_item},
                 )
-                if args.profile and epoch == self.epochs - 1 and i == num_iter - 1:
+                if args.tensorboard and epoch == self.epochs - 1 and i == num_iter - 1:
                     tf.profiler.experimental.stop()
                     print("---- collect tensorboard end")
                 end_time = time.time()
-                print("{} iter`s duration: {}".format(i, end_time - start_time))
+                print("Iteration: {}, inference time: {}".format(i, end_time - start_time))
                 if i > args.num_warmup:
                     total_time += end_time - start_time
                     total_sample += self.batch_size
