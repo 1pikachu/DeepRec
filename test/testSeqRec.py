@@ -11,6 +11,8 @@ from utils.load_data.load_data_seq import DataSet
 from utils.load_data.load_data_ranking import *
 
 
+tf.config.experimental.enable_tensor_float_32_execution(False)
+
 def parse_args():
     parser = argparse.ArgumentParser(description='DeepRec')
     parser.add_argument('--model', choices=['Caser','PRME', 'AttRec'], default = 'AttRec')
