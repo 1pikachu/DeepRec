@@ -331,7 +331,7 @@ class Caser():
                     tf.profiler.experimental.stop()
                     print("---- collect tensorboard end")
                 end_time = time.time()
-                print("Iteration: {}, inference time: {}".format(i, end_time - start_time), flush=True)
+                print("Iteration: {}, inference time: {}".format(i + (epoch * num_iter), end_time - start_time), flush=True)
                 if i > args.num_warmup:
                     total_time += end_time - start_time
                     total_sample += self.batch_size
