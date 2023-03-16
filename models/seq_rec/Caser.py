@@ -18,6 +18,15 @@ __maintainer__ = "Shuai Zhang"
 __email__ = "cheungdaven@gmail.com"
 __status__ = "Development"
 
+def pad_dataset(x, batch_size):
+    total_item = len(x)
+    remain_item = total_item % batch_size
+    if remain_item > 0:
+        pad_item = batch_size - remain_item
+        one_item = x[0]
+        for i in range(pad_item):
+            x.append(one_item)
+    return x
 
 class Caser():
     def __init__(self, sess, num_user, num_item, learning_rate=0.001, reg_rate=1e-6, epoch=500, batch_size=1000,
@@ -293,7 +302,6 @@ class Caser():
         for epoch in range(self.epochs):
             print("---- {} epoch start".format(epoch))
             self.num_training = len(self.sequences)
-            self.total_batch = int(self.num_training / self.batch_size)
             L, T = train_data.sequences.L, train_data.sequences.T
             self.test_sequences = train_data.test_sequences.sequences
             idxs = np.random.permutation(
@@ -303,6 +311,13 @@ class Caser():
             targets_random = list(self.targets[idxs])
             users_random = [i[0] for i in list(self.users[idxs])]
             self.x_random = list(self.x[idxs])
+
+            pad_dataset(users_random, self.batch_size)
+            pad_dataset(sequences_random, self.batch_size)
+            pad_dataset(targets_random, self.batch_size)
+            item_count = len(users_random)
+            self.num_training = len(sequences_random)
+            self.total_batch = int(self.num_training / self.batch_size)
 
             num_iter = min(self.total_batch, args.num_iter)
             for i in range(num_iter):
@@ -332,7 +347,7 @@ class Caser():
                     print("---- collect tensorboard end")
                 end_time = time.time()
                 print("Iteration: {}, inference time: {}".format(i + (epoch * num_iter), end_time - start_time), flush=True)
-                if i > args.num_warmup:
+                if i > args.num_warmup or i == (num_iter - 1):
                     total_time += end_time - start_time
                     total_sample += self.batch_size
                 # save profiling file
