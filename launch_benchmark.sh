@@ -54,7 +54,7 @@ function generate_core {
         fi
 	OOB_EXEC_HEADER+=" ${OOB_EXTRA_HEADER} "
         printf " ${OOB_EXEC_HEADER} \
-	    python testSeqRec.py --model ${model_name} \
+	    python testSeqRec.py --model ${model_name} --mode_name ${mode_name} \
 		--precision ${precision} --batch_size $batch_size \
                 ${addtion_options} \
         > ${log_file} 2>&1 &  \n" |tee -a ${excute_cmd_file}

@@ -316,14 +316,18 @@ class AttRec():
         self.prepare_data(train_data, test_data)
         init = tf.compat.v1.global_variables_initializer()
         self.sess.run(init)
-        for epoch in range(self.epochs):
+        total_time = 0
+        for epoch in range(self.epochs+1):
             if self.verbose:
                 print("Epoch: %04d;" % (epoch))
+            start_time = time.time()
             self.train(train_data)
-        #    if (epoch) % self.T == 0 and epoch >= 5:
-        #        print("Epoch: %04d; " % (epoch), end='')
-        #        self.test(test_data)
-
+            if epoch >= 1:
+                total_time += time.time() - start_time
+            if (epoch) % self.T == 0 and epoch >= 5:
+                print("Epoch: %04d; " % (epoch), end='')
+                self.test(test_data)
+        print("training Throughput: ", self.num_training * self.epochs / total_time)
 
     def prepare_data(self, train_data, test_data):
         self.sequences = train_data.sequences.sequences
